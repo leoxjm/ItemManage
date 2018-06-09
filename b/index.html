@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <!-- 引入样式 -->
+    <link rel="stylesheet" href="./src/css/index.css">
+    <link rel="stylesheet" href="./src/css/doordu.css">
+    <style>
+        .title-cell-class-name-test1 {
+            background-color: #2db7f5;
+        }
+        .title-cell-class-name-test2 {
+            background-color: #f60;
+        }
+    </style>
+    <title>研发管理工具</title>
+</head>
+<body>
+
+<div id="app" >
+    <component-search :enums="enums" :count="count" @ee="searchList">
+        <!--v-for="post in enums"-->
+        <!--v-bind:key="post.id"-->
+        <!--v-bind:post="post"-->
+    </component-search>
+
+    <!--<div style="line-height: 40px">-->
+        <!--快速查询：<select name="f" id="">-->
+        <!--<option value="">全部</option>-->
+        <!--<option value="people_name">姓名</option>-->
+        <!--<option value="role">角色</option>-->
+        <!--<option value="people_status">人员状态</option>-->
+        <!--<option value="system_name">系统名</option>-->
+        <!--<option value="system_version">版本号</option>-->
+        <!--<option value="now_stage">阶段</option>-->
+    <!--</select>-->
+        <!--<input type="text" name="v">-->
+    <!--</div>-->
+    <v-table
+            :title-rows="titleRows"
+            :columns="columns"
+            :table-data="tableData"
+            row-hover-color="#edf7ff"
+            row-click-color="#d1dbe5"
+            @on-custom-comp="customCompFunc"
+            column-width-drag
+            :title-row-height=60
+            :cell-edit-done="cellEditDone"
+            :is-vertical-resize=true
+            :filter-method="filterMethod"
+            is-horizontal-resize
+            title-bg-color="#d7dde4"
+            style="width:100%"
+    >
+
+    </v-table>
+    <input type="button" @click="addRow()" value="新增行">
+    <input type="button" @click="manageCol()" value="管理列">
+    <input type="button" @click="tableReload()" value="刷新">
+</div>
+</body>
+<!-- 先引入 Vue -->
+<script src="./src/js/vue.js"></script>
+<script src="./src/js/vue-resoure.min.js"></script>
+<!-- 引入组件库 -->
+<script src="./src/js/index.js"></script>
+
+<script>
+    var my_enum =[];
+    // 定义一个名为 search-counter 的新组件
+    var ComponentSearch = {
+        props:{
+            enums:{
+                type:Array|Object
+            },
+            count:{
+                type:Number
+            }
+        },
+        watch: {
+            enums(val){
+                var all = val.all;
+                var em = [{name:'全部',key:'all'}];
+                delete val.all;
+                for (i in val){
+                    em.push({name:all[i],key:i})
+                }
+                console.log(em);
+                this.count2 = 4;
+                this.items = em;
+            }
+        },
+        data: function () {
+            console.log(this.count);
+            return {
+                items: this.enums,
+                value: '12',
+                input1: "",
+                select1: "all"
+            }
+        },
+        methods: {
+            search:function () {
+                var searchStr = {};
+                searchStr[this.select1]=this.input1;
+                searchStr['like']=1;
+                console.log(searchStr);
+                this.$emit('ee',searchStr);
+            }
+        },
+            template: '<div style="line-height: 40px">快速查询：' +
+            '<select  v-model="select1">' +
+            ' <option v-for="(item,key) of items" v-bind:value="item.key" >{{item.name}}</option>' +
+            '</select>' +
+            '<input v-model="input1" type="text" @keyup.enter="search">' +
+            '<button @click.stop.prevent="search()">查询</button></div>'
+    };
+    var app=new Vue({
+            el: '#app',
+            components: {
+                'component-search': ComponentSearch
+            },
+            data: function () {
+                return {
+                    count:1,
+                    multipleSort: false,
+                    tableData: [],
+                    columns: [],
+                    titleRows: [],
+                    enums: [],
+                    dataApi:'/other/develop_manage/api/table'
+                }
+            },
+            created:function(){
+                this.getTableData().then(function(rows){
+                    console.log(rows);
+                    this.columns = rows.columns;
+                    this.tableData = rows.body;
+                    this.titleRows = rows.title;
+                    this.enums = rows.enum;
+                }.bind(this))
+            },
+            methods: {
+                searchList:function (str) {
+                    this.getTableData(true,str).then(function(rows){
+                        console.log(rows)
+                    }.bind(this))
+                },
+                getTableData:function(show,filters){
+                    return new Promise(function(resolve,reject){
+                        this.$http.get(this.dataApi,{params:filters}).then(function (res) {
+                            var table = res.body.data;
+                            table.columns[0].formatter=function (rowData, index) {
+                                return index < 3 ? '<span style="color:red;font-weight: bold;">' + (index + 1) + '</span>' : index + 1
+                            };
+                            table.columns.push({field: 'custome-adv', title: '操作',width: 250, titleAlign: 'center',columnAlign:'center',componentName:'table-operation',isResize:true});
+                            my_enum = table.enum;
+                            if(show){
+                                this.columns = table.columns;
+                                this.tableData = table.body;
+                                this.titleRows = table.title;
+                            }
+                            resolve(table)
+                        },function (res) {
+                            reject(res.body);
+                            return false;
+                        });
+                    }.bind(this));
+
+                },
+                addRow: function () {
+                    app.tableData.push({"people_name":"新用户","role":"","people_status":"","system_name":"","system_version":"","now_stage":"","begin_time":"","end_time":""});
+                },
+                manageCol: function () {
+                    window.open("./columns.html")
+                },
+                tableReload: function (){
+                    location.reload();
+                },
+                // 数据筛选
+                filterMethod:function(filters){
+                    this.getTableData(false,filters).then(function(rows){
+                        for ( i in rows.columns){
+                            if(this.columns[i].componentName=='table-select-opt'){
+                                rows.columns[i].componentName = 'table-select-opt2';
+                            }else if(this.columns[i].componentName=='table-select-opt2'){
+                                rows.columns[i].componentName = 'table-select-opt';
+                            }
+                        }
+                        this.columns = rows.columns;
+                        this.tableData = rows.body;
+                    }.bind(this));
+                },
+                // 单元格编辑回调
+                cellEditDone:function(newValue,oldValue,rowIndex,rowData,field){
+                    console.log(this.tableData[rowIndex]);
+                    this.tableData[rowIndex][field] = newValue;
+                    // 接下来处理你的业务逻辑，数据持久化等...
+                },
+                customCompFunc:function(params){
+                    if (params.type === 'edit'){ // do edit operation
+                        this.$http.post(this.dataApi, params.rowData).then(function (res) {
+                            this.getTableData(true);
+                            console.log(res);
+                        },function (error) {
+                            console.log('请求失败处理');
+                            alert(error.body.msg);
+                        });
+                    }else if (params.type === 'delete'){ // do delete operation
+                        this.$http.patch(this.dataApi, {id:params.rowData.id}).then(function (res) {
+                            console.log(res);
+                        },function (error) {
+                            console.log('请求失败处理');
+                            alert(error.body.msg);
+                            return false;
+                        });
+                        this.$delete(this.tableData,params.index);
+                    }else if(params.type === 'history'){
+                        this.$http.get(this.dataApi+'?h='+params.rowData.people_name).then(function (res) {
+                            var table = res.body.data;
+                            table.columns[0].formatter=function (rowData, index) {
+                                    return index < 3 ? '<span style="color:red;font-weight: bold;">' + (index + 1) + '</span>' : index + 1
+                                };
+                            this.titleRows = table.title;
+                            this.columns = table.columns;
+                            this.tableData = table.body;
+                        },function (error) {
+                            console.log('请求失败处理');
+                            alert(error.body.msg);
+                        });
+                    }
+                }
+            }
+        });
+        // 自定义列组件
+        Vue.component('table-operation',{
+            template:`<span>
+        <a href="" @click.stop.prevent="update(rowData,index)">{{updateName}}</a>&nbsp;
+        <a href="" @click.stop.prevent="deleteRow(rowData,index)">{{deleteName}}</a>&nbsp;
+        <a href="" @click.stop.prevent="historyRow(rowData,index)">{{historyName}}</a>
+        </span>`,
+            props:{
+                rowData:{
+                    type:Object
+                },
+                field:{
+                    type:String
+                },
+                index:{
+                    type:Number
+                }
+            },
+            data: function () {
+                return {
+                    updateName: '保存工作',
+                    deleteName: this.rowData.id?'完成工作':'',
+                    historyName: '过往工作'
+                }
+            },
+            methods:{
+                update(){
+                    // 参数根据业务场景随意构造
+                    var params = {type:'edit',index:this.index,rowData:this.rowData};
+                    this.$emit('on-custom-comp',params);
+                },
+                historyRow(){
+                    // 参数根据业务场景随意构造
+                    var params = {type:'history',index:this.index,rowData:this.rowData};
+                    this.$emit('on-custom-comp',params);
+                },
+                deleteRow(){
+                    // 参数根据业务场景随意构造
+                    var params = {type:'delete',index:this.index,rowData:this.rowData};
+                    this.$emit('on-custom-comp',params);
+                }
+            }
+        });
+
+        Vue.component('table-select-opt',{
+            template:'<div><select  v-model="selected" @change.stop.prevent="updateRow(index,field)" style="border:0px solid red;">' +
+            '           <option v-for="(item,key) of items" v-bind:value="item" >{{item}}</option>' +
+            '       </select></div>',
+            props:{
+                rowData:{
+                    type:Object
+                },
+                field:{
+                    type:String
+                },
+                index:{
+                    type:Number
+                }
+            },
+//            created:function() {
+//                console.log('aaaaa')
+//            },
+            data: function () {
+                var field = this.field;
+                return {
+                    selected:this.rowData[field],
+                    items: my_enum[field]
+                }
+            },
+            methods:{
+                updateRow(index,field){
+                    app.tableData[index][field] = this.selected;
+                }
+            }
+        });
+    Vue.component('table-select-opt2',{
+        template:'<div><select  v-model="selected" @change.stop.prevent="updateRow(index,field)"  style="border:0px solid red;">' +
+        '           <option v-for="item in items" v-bind:value="item" >{{item}}</option>' +
+        '       </select></div>',
+        props:{
+            rowData:{
+                type:Object
+            },
+            field:{
+                type:String
+            },
+            index:{
+                type:Number
+            }
+        },
+        data: function () {
+            var field = this.field;
+            return {
+                selected:this.rowData[field],
+                items: my_enum[field]
+            }
+        },
+        methods:{
+            updateRow(index,field){
+                app.tableData[index][field] = this.selected;
+            }
+        }
+    });
+</script>
+</html>

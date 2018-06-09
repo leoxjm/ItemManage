@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <!-- 引入样式 -->
+    <link rel="stylesheet" href="./src/css/index.css">
+    <link rel="stylesheet" href="./src/css/doordu.css">
+    <style>
+        .title-cell-class-name-test2 {
+            background-color: #f60;
+        }
+    </style>
+    <title>表格列管理</title>
+</head>
+<body>
+
+
+<div id="app">
+    <v-table
+            even-bg-color="#f2f2f2"
+            :title-rows="titleRows"
+            :columns="columns"
+            :table-data="tableData"
+            row-hover-color="#eee"
+            row-click-color="#edf7ff"
+            @on-custom-comp="customCompFunc"
+            column-width-drag
+            :title-row-height="40"
+            :cell-edit-done="cellEditDone"
+            :is-vertical-resize=true
+            is-horizontal-resize
+            style="width:100%"
+    ></v-table>
+    <input type="button" @click="addRow()" value="新增">
+</div>
+</body>
+<!-- 先引入 Vue -->
+<script src="./src/js/vue.js"></script>
+<script src="./src/js/vue-resoure.min.js"></script>
+<!-- 引入组件库 -->
+<script src="./src/js/index.js"></script>
+<script>
+    var app=new Vue({
+        el: '#app',
+        data: function () {
+            return {
+                multipleSort: false,
+                tableData: [],
+                columns: [],
+                titleRows: [[]],
+                dataApi:'/other/develop_manage/api/columns'
+            }
+        },
+        methods: {
+            addRow: function () {
+                app.tableData.push({"en_name":"列英文名","cn_name":"列中文名","sort_num":99,"type":"字符串","type_value":"","width":100});
+                for (i in app.columns){
+                    if (app.columns[i].field =='en_name'){
+                        app.columns[i].isEdit = true;
+                    }
+                }
+            },
+            // 单元格编辑回调
+            cellEditDone:function(newValue,oldValue,rowIndex,rowData,field){
+                console.log(this.tableData[rowIndex]);
+                this.tableData[rowIndex][field] = newValue;
+                // 接下来处理你的业务逻辑，数据持久化等...
+            },
+            customCompFunc:function(params){
+                console.log(params);
+                if (params.type === 'edit'){ // do edit operation
+                    this.$http.post(this.dataApi, params.rowData).then(function (res) {
+                        console.log(res);
+                    },function (error) {
+                        console.log('请求失败处理');
+                        alert(error.body.msg);
+                    });
+                }
+            }
+        }
+    });
+
+    // 自定义列组件
+    Vue.component('table-operation',{
+        template:`<span>
+        <a href="" @click.stop.prevent="update(rowData,index)">更新</a>&nbsp;
+        </span>`,
+        props:{
+            rowData:{
+                type:Object
+            },
+            field:{
+                type:String
+            },
+            index:{
+                type:Number
+            }
+        },
+        methods:{
+            update(){
+                // 参数根据业务场景随意构造
+                var params = {type:'edit',index:this.index,rowData:this.rowData};
+                this.$emit('on-custom-comp',params);
+            }
+        }
+    });
+     Vue.component('table-select-opt',{
+        template:'<select  v-model="selected" @change.stop.prevent="updateRow(rowData,index,field)">' +
+        '           <option v-for="item in items" v-bind:value="item.message" >{{item.message}}</option>' +
+        '       </select>',
+        props:{
+            rowData:{
+                type:Object
+            },
+            field:{
+                type:String
+            },
+            index:{
+                type:Number
+            }
+        },
+        data: function () {
+            return {
+                selected:this.rowData.type,
+                items: [
+                { message: '字符串'},
+                { message: '数字' },
+                { message: '文本'},
+                { message: '日期'},
+                { message: '枚举'}
+            ]}
+        },
+        methods:{
+            updateRow(rowData,index,field){
+                app.tableData[index][field] = this.selected;
+            }
+        }
+    });
+    Vue.http.get(app.dataApi).then(function (res) {
+        var table = res.body.data;
+        app.titleRows = table.title;
+//            table.columns.push({field: 'custome-adv', title: '操作',width: 200, titleAlign: 'center',columnAlign:'center',componentName:'table-operation',isResize:true});
+        app.columns = table.columns;
+        app.columns[0]=({field: 'custome', title: '操作',width: 150, titleAlign: 'center',columnAlign:'center',componentName:'table-operation',isResize:true,isFrozen:true});
+        app.tableData = table.body;
+        console.log(table);
+    },function (error) {
+        alert(error.body.msg);
+    });
+</script>
+</html>
